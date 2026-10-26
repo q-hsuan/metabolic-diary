@@ -1,0 +1,22 @@
+{
+  "name": "雙軌代謝追蹤日記",
+  "short_name": "代謝日記",
+  "description": "血醣、酮體數值與三餐飲食照片雙軌追蹤 App",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

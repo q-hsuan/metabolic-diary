@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>雙軌代謝日記</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="代謝日記">
+  <meta name="theme-color" content="#0284c7">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: calc(75px + env(safe-area-inset-bottom));
+    }
+    .custom-scrollbar::-webkit-scrollbar { display: none; }
+    .custom-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen">
+  <!-- 頂部導航列 -->
+  <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-xs">
+    <div class="max-w-lg mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+          <i class="fa-solid fa-heart-pulse text-sm"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base text-slate-900 leading-tight">雙軌代謝日記</h1>
+          <p class="text-[10px] text-slate-500 font-medium">糖酮數值 ✕ 三餐飲食</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="unitBtn" onclick="toggleUnit()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-semibold border border-slate-200 transition">
+          單位: mg/dL
+        </button>
+        <button id="cloudBtn" onclick="openCloudModal()" class="p-1.5 text-slate-600 hover:text-slate-900 relative" title="雲端共用">
+          <i class="fa-solid fa-cloud text-base"></i>
+          <span id="cloudDot" class="hidden absolute top-1 right-0.5 w-2 h-2 rounded-full bg-emerald-500"></span>
+        </button>
+        <button onclick="exportCSV()" class="p-1.5 text-slate-600 hover:text-slate-900" title="匯出 CSV">
+          <i class="fa-solid fa-arrow-up-from-bracket text-base"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 唯讀檢視模式提示列 -->
+  <div id="viewerBanner" class="hidden max-w-lg mx-auto px-4 pt-3">
+    <div class="flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-3 py-2 text-xs">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <i class="fa-solid fa-eye"></i>
+        <span class="font-semibold">唯讀檢視</span>
+        <span id="viewerUpdatedAt" class="text-indigo-500 truncate">載入中…</span>
+      </div>
+      <button onclick="loadViewerData()" class="shrink-0 bg-white border border-indigo-200 rounded-lg px-2 py-1 font-medium hover:bg-indigo-100">
+        <i class="fa-solid fa-rotate-right mr-1"></i>重新整理
+      </button>
+    </div>
+  </div>
+
+  <!-- 主視圖容器 -->
+  <main class="max-w-lg mx-auto px-4 pt-3 pb-8 space-y-4">
+    <!-- 頂端分頁切換 -->
+    <div class="grid grid-cols-3 gap-1 bg-slate-200/80 p-1 rounded-xl text-xs font-semibold text-slate-600">
+      <button onclick="switchTab('all')" id="tab-all" class="py-2 rounded-lg bg-white text-indigo-600 shadow-xs font-bold transition">
+        <i class="fa-solid fa-layer-group mr-1"></i>雙軌每日對照
+      </button>
+      <button onclick="switchTab('part1')" id="tab-part1" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 font-medium transition">
+        <i class="fa-solid fa-droplet text-sky-500 mr-1"></i>醣酮
+      </button>
+      <button onclick="switchTab('part2')" id="tab-part2" class="py-2 rounded-lg text-slate-600 hover:text-slate-900 font-medium transition">
+        <i class="fa-solid fa-utensils text-amber-500 mr-1"></i>三餐
+      </button>
+    </div>
+
+    <!-- 快速概要卡片 -->
+    <section id="summaryBanner" class="grid grid-cols-3 gap-2">
+      <div class="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+          <span>平均血糖</span>
+          <i class="fa-solid fa-droplet text-sky-500"></i>
+        </div>
+        <div class="text-lg font-bold text-slate-800" id="avgGlucose">--</div>
+        <div class="text-[10px] text-slate-400" id="unitLabel1">mg/dL</div>
+      </div>
+      <div class="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+          <span>平均血酮</span>
+          <i class="fa-solid fa-fire text-amber-500"></i>
+        </div>
+        <div class="text-lg font-bold text-slate-800" id="avgKetone">--</div>
+        <div class="text-[10px] text-slate-400">mmol/L</div>
+      </div>
+      <div class="bg-white rounded-2xl p-3 border border-slate-200/80 shadow-xs">
+        <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+          <span>最新 GKI</span>
+          <i class="fa-solid fa-gauge-high text-emerald-500"></i>
+        </div>
+        <div class="text-lg font-bold text-emerald-600" id="latestGki">--</div>
+        <div class="text-[10px] text-slate-400 truncate" id="gkiZone">代謝燃脂診斷</div>
+      </div>
+    </section>
+
+    <!-- 第一部分專屬圖表區 -->
+    <section id="chartSection" class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-1.5">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+          <h2 class="text-xs font-bold text-slate-800 tracking-wide uppercase">醣酮雙軸趨勢圖</h2>
+        </div>
+        <select id="chartFilter" onchange="renderChart()" class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none">
+          <option value="all">全部時點</option>
+          <option value="早上空腹">早上空腹</option>
+          <option value="午時空腹">午時空腹</option>
+          <option value="餐後2時">餐後2時</option>
+          <option value="餐後3時">餐後3時</option>
+        </select>
+      </div>
+      <div class="relative h-48 w-full">
+        <canvas id="metabolicChart"></canvas>
+      </div>
+    </section>
+
+    <!-- 動態列表容器 -->
+    <section id="streamContainer" class="space-y-4"></section>
+  </main>
+
+  <!-- 底部固定按鈕操作欄 -->
+  <div id="bottomBar" class="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-t border-slate-200 p-3">
+    <div class="max-w-lg mx-auto grid grid-cols-2 gap-3">
+      <button onclick="openNewGlucoseModal()" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-medium text-xs shadow-md shadow-sky-500/20 active:scale-[0.98] transition">
+        <i class="fa-solid fa-droplet text-sm"></i>
+        <span>記醣酮</span>
+      </button>
+      <button onclick="openNewMealModal()" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs shadow-md shadow-amber-500/20 active:scale-[0.98] transition">
+        <i class="fa-solid fa-camera text-sm"></i>
+        <span>記三餐</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 彈窗一：第一部 (血醣、酮體) -->
+  <div id="glucoseModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center hidden">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto custom-scrollbar animate-slide-up">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center">
+            <i class="fa-solid fa-droplet text-sm"></i>
+          </div>
+          <h3 id="glucoseModalTitle" class="font-bold text-slate-800 text-base">記錄醣酮</h3>
+        </div>
+        <button onclick="closeModal('glucoseModal')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="glucoseForm" onsubmit="saveGlucoseRecord(event)" class="space-y-4 pt-3">
+        <input type="hidden" id="editGlucoseId" value="">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+            Title Name（量測時點情境）<span class="text-sky-600">*</span>
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="timingTitle" value="早上空腹" checked class="peer sr-only">
+              <div class="p-2.5 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 transition">
+                <i class="fa-regular fa-sun text-sky-500 mr-1"></i>早上空腹
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="timingTitle" value="午時空腹" class="peer sr-only">
+              <div class="p-2.5 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 transition">
+                <i class="fa-solid fa-cloud-sun text-sky-500 mr-1"></i>午時空腹
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="timingTitle" value="餐後2時" class="peer sr-only">
+              <div class="p-2.5 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 transition">
+                <i class="fa-solid fa-clock-rotate-left text-sky-500 mr-1"></i>餐後2時
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="timingTitle" value="餐後3時" class="peer sr-only">
+              <div class="p-2.5 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 transition">
+                <i class="fa-solid fa-hourglass-half text-sky-500 mr-1"></i>餐後3時
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">量測日期</label>
+            <input type="date" id="glucoseDate" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">量測時間</label>
+            <input type="time" id="glucoseTime" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              血醣數值 <span id="formUnitLabel" class="text-slate-400 font-normal">(mg/dL)</span>
+            </label>
+            <input type="number" step="any" id="glucoseValue" placeholder="例: 92" required oninput="calcPreviewGki()" class="w-full text-sm font-semibold bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">
+              酮體數值 <span class="text-slate-400 font-normal">(mmol/L)</span>
+            </label>
+            <input type="number" step="0.1" id="ketoneValue" placeholder="例: 1.4" required oninput="calcPreviewGki()" class="w-full text-sm font-semibold bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <div id="gkiCalcBox" class="p-2.5 rounded-xl bg-sky-50/70 border border-sky-100 flex items-center justify-between text-xs">
+          <div class="text-sky-800">
+            <span class="font-medium">即時 GKI 運算：</span>
+            <span id="previewGkiVal" class="font-bold text-sky-900">--</span>
+          </div>
+          <span id="previewGkiText" class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-white text-sky-700 border border-sky-200">請輸入數值</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">身體狀態備註（選填）</label>
+          <input type="text" id="glucoseNotes" placeholder="例：精神清爽、運動後30分鐘量測..." class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500">
+        </div>
+
+        <button type="submit" id="glucoseSubmitBtn" class="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm shadow-md shadow-sky-500/20 active:scale-[0.98] transition">
+          儲存醣酮
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 彈窗二：第二部 (三餐食物與照片) -->
+  <div id="mealModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center hidden">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto custom-scrollbar animate-slide-up">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+            <i class="fa-solid fa-utensils text-sm"></i>
+          </div>
+          <h3 id="mealModalTitle" class="font-bold text-slate-800 text-base">記錄三餐</h3>
+        </div>
+        <button onclick="closeModal('mealModal')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="mealForm" onsubmit="saveMealRecord(event)" class="space-y-4 pt-3">
+        <input type="hidden" id="editMealId" value="">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">餐別<span class="text-amber-500">*</span></label>
+          <div class="grid grid-cols-4 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="mealType" value="早餐" checked class="peer sr-only">
+              <div class="p-2 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition">早餐</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="mealType" value="午餐" class="peer sr-only">
+              <div class="p-2 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition">午餐</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="mealType" value="晚餐" class="peer sr-only">
+              <div class="p-2 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition">晚餐</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="mealType" value="點心" class="peer sr-only">
+              <div class="p-2 rounded-xl border border-slate-200 text-center text-xs font-semibold peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 transition">點心</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">用餐日期</label>
+            <input type="date" id="mealDate" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">用餐時間</label>
+            <input type="time" id="mealTime" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5">食物照片（可拍照或從相簿選擇）</label>
+          
+          <!-- 隱藏的兩個原生 File Input -->
+          <!-- 1. 純拍照 (capture="environment") -->
+          <input type="file" id="mealCameraInput" accept="image/*" capture="environment" onchange="handlePhotoUpload(event)" class="hidden">
+          <!-- 2. 相簿選取 (無 capture 屬性，手機會直接開啟照片圖庫) -->
+          <input type="file" id="mealGalleryInput" accept="image/*" onchange="handlePhotoUpload(event)" class="hidden">
+
+          <div id="photoPlaceholder" class="p-3 border-2 border-dashed border-slate-200 hover:border-amber-400 rounded-2xl text-center bg-slate-50 transition space-y-2.5">
+            <div class="text-slate-400">
+              <i class="fa-solid fa-utensils text-2xl text-amber-500"></i>
+              <p class="text-xs text-slate-600 font-medium mt-1">記錄當餐美味食物</p>
+              <p class="text-[10px] text-slate-400">系統自動輕量壓縮，不佔本機儲存空間</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button type="button" onclick="document.getElementById('mealCameraInput').click()" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-amber-400 text-slate-700 text-xs font-medium shadow-2xs active:scale-95 transition">
+                <i class="fa-solid fa-camera text-amber-500"></i>
+                <span>開啟相機拍照</span>
+              </button>
+              <button type="button" onclick="document.getElementById('mealGalleryInput').click()" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white border border-slate-200 hover:border-amber-400 text-slate-700 text-xs font-medium shadow-2xs active:scale-95 transition">
+                <i class="fa-solid fa-images text-indigo-500"></i>
+                <span>從相簿挑選</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 照片已選取的預覽區塊 -->
+          <div id="photoPreviewContainer" class="hidden relative rounded-2xl overflow-hidden border border-slate-200 shadow-2xs">
+            <img id="photoPreviewImg" src="" alt="食物照片預覽" class="w-full h-44 object-cover">
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-2.5 flex items-center justify-between text-white text-xs">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('mealCameraInput').click()" class="bg-white/20 hover:bg-white/30 backdrop-blur-xs px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1">
+                  <i class="fa-solid fa-camera"></i>重拍
+                </button>
+                <button type="button" onclick="document.getElementById('mealGalleryInput').click()" class="bg-white/20 hover:bg-white/30 backdrop-blur-xs px-2.5 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1">
+                  <i class="fa-solid fa-images"></i>重選相簿
+                </button>
+              </div>
+              <button type="button" onclick="clearPhoto(event)" class="bg-rose-500/80 hover:bg-rose-600 px-2 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1">
+                <i class="fa-solid fa-trash-can"></i>移除
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">碳水比例估計</label>
+          <div class="grid grid-cols-4 gap-1.5 text-[11px]">
+            <label class="cursor-pointer">
+              <input type="radio" name="carbLevel" value="嚴格生酮" checked class="peer sr-only">
+              <div class="py-1.5 rounded-lg border border-slate-200 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 font-medium">嚴格生酮</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="carbLevel" value="低碳溫和" class="peer sr-only">
+              <div class="py-1.5 rounded-lg border border-slate-200 text-center peer-checked:border-sky-500 peer-checked:bg-sky-50 peer-checked:text-sky-700 font-medium">低碳溫和</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="carbLevel" value="適量碳水" class="peer sr-only">
+              <div class="py-1.5 rounded-lg border border-slate-200 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 font-medium">適量碳水</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="carbLevel" value="高碳升糖" class="peer sr-only">
+              <div class="py-1.5 rounded-lg border border-slate-200 text-center peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-700 font-medium">高碳升糖</div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">三餐食物內容</label>
+          <textarea id="mealFoodDesc" rows="2" placeholder="例：防彈黑咖啡 + 雙半熟荷包蛋 + 乾煎鮭魚排佐酪梨沙拉..." required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"></textarea>
+        </div>
+
+        <button type="submit" id="mealSubmitBtn" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm shadow-md shadow-amber-500/20 active:scale-[0.98] transition">
+          儲存三餐
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 彈窗三：Google 雲端共用設定 -->
+  <div id="cloudModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center hidden">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-5 max-h-[92vh] overflow-y-auto custom-scrollbar">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+            <i class="fa-solid fa-cloud text-sm"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-base">Google 雲端共用</h3>
+        </div>
+        <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 pt-3">
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          資料會存到你 Google 雲端硬碟中的 JSON 檔。其他人用「分享連結」開啟即可唯讀查看，無法修改。設定步驟見 README。
+        </p>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Apps Script 網頁應用程式網址</label>
+          <input type="url" id="cloudUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">寫入密碼 <span class="text-slate-400 font-normal">(與 Apps Script 內的 WRITE_KEY 相同，不會出現在分享連結中)</span></label>
+          <input type="password" id="cloudKeyInput" autocomplete="off" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
+        <label class="flex items-center gap-2 text-xs text-slate-700">
+          <input type="checkbox" id="cloudAutoInput" class="accent-indigo-600">
+          每次新增、修改、刪除後自動上傳
+        </label>
+        <div id="cloudStatus" class="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">尚未設定</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="saveCloudSettingsAndUpload()" class="py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs">
+            <i class="fa-solid fa-cloud-arrow-up mr-1"></i>儲存並上傳
+          </button>
+          <button onclick="copyShareLink()" class="py-2.5 rounded-xl bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-medium text-xs">
+            <i class="fa-solid fa-link mr-1"></i>複製分享連結
+          </button>
+        </div>
+        <div class="border-t border-slate-100 pt-3 space-y-2">
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            <b class="text-slate-700">交給主要記錄者：</b>把「記錄者設定連結」傳給要負責記錄的人（例如家人），對方開啟後即自動完成設定、可新增與修改。此連結含寫入密碼，請勿外傳。同一時間只應有一支手機負責上傳。
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="copyOwnerSetupLink()" class="py-2.5 rounded-xl bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 font-medium text-xs">
+              <i class="fa-solid fa-user-pen mr-1"></i>複製記錄者設定連結
+            </button>
+            <button onclick="stopUploadingHere()" class="py-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs">
+              <i class="fa-solid fa-ban mr-1"></i>此手機停止上傳
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 照片燈箱 -->
+  <div id="lightboxModal" onclick="closeLightbox()" class="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 hidden">
+    <div class="relative max-w-md w-full" onclick="event.stopPropagation()">
+      <button onclick="closeLightbox()" class="absolute -top-10 right-0 text-white text-xl p-2">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <img id="lightboxImg" src="" alt="放大食物照" class="w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl">
+      <div id="lightboxCaption" class="mt-3 text-center text-white text-xs font-light"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY_GLUCOSE = 'metabolic_glucose_records_v3';
+    const STORAGE_KEY_MEALS = 'metabolic_meal_records_v3';
+    const STORAGE_KEY_UNIT = 'metabolic_preferred_unit_v3';
+
+    let isMgDl = localStorage.getItem(STORAGE_KEY_UNIT) !== 'mmol/L';
+    let currentTab = 'all';
+    let currentCompressedPhoto = null;
+    let chartInstance = null;
+
+    function initSeedData() {
+      if (!localStorage.getItem(STORAGE_KEY_GLUCOSE)) {
+        const seedGlucose = [
+          { id: 'g1', timingTitle: '早上空腹', date: '2026-10-25', time: '07:30', glucose: 88, ketone: 1.6, notes: '晨起精神佳，深沉睡眠7.5小時' },
+          { id: 'g2', timingTitle: '餐後2時', date: '2026-10-25', time: '10:15', glucose: 104, ketone: 1.2, notes: '早餐後2小時量測' },
+          { id: 'g3', timingTitle: '餐後3時', date: '2026-10-25', time: '11:15', glucose: 91, ketone: 1.4, notes: '血醣順利回歸基礎線' },
+          { id: 'g4', timingTitle: '午時空腹', date: '2026-10-25', time: '12:30', glucose: 86, ketone: 1.8, notes: '午餐前空腹量測' },
+          { id: 'g5', timingTitle: '餐後2時', date: '2026-10-25', time: '14:45', glucose: 112, ketone: 1.0, notes: '午餐後2小時' },
+          { id: 'g6', timingTitle: '餐後3時', date: '2026-10-25', time: '15:45', glucose: 94, ketone: 1.3, notes: '午後能量平穩' },
+          { id: 'g7', timingTitle: '早上空腹', date: '2026-10-24', time: '07:40', glucose: 92, ketone: 1.4, notes: '起床測量' }
+        ];
+        localStorage.setItem(STORAGE_KEY_GLUCOSE, JSON.stringify(seedGlucose));
+      }
+
+      if (!localStorage.getItem(STORAGE_KEY_MEALS)) {
+        const seedMeals = [
+          { id: 'm1', mealType: '早餐', date: '2026-10-25', time: '08:15', carbLevel: '嚴格生酮', foodDesc: '防彈黑咖啡(MCT油+草飼牛油) + 雙半熟荷包蛋 + 堅果少許', photo: '' },
+          { id: 'm2', mealType: '午餐', date: '2026-10-25', time: '12:45', carbLevel: '低碳溫和', foodDesc: '嫩煎雞腿排佐花椰菜米 + 酪梨半顆佐黑胡椒海鹽', photo: '' },
+          { id: 'm3', mealType: '早餐', date: '2026-10-24', time: '08:30', carbLevel: '嚴格生酮', foodDesc: '起司歐姆蛋佐煙燻培根兩片 + 無糖黑咖啡', photo: '' }
+        ];
+        localStorage.setItem(STORAGE_KEY_MEALS, JSON.stringify(seedMeals));
+      }
+    }
+
+    function getGlucoseRecords() {
+      if (isViewer) return viewerData.glucose;
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_GLUCOSE) || '[]');
+    }
+    function saveGlucoseRecords(data) {
+      if (isViewer) return;
+      localStorage.setItem(STORAGE_KEY_GLUCOSE, JSON.stringify(data));
+      scheduleCloudSync();
+    }
+    function getMealRecords() {
+      if (isViewer) return viewerData.meals;
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_MEALS) || '[]');
+    }
+    function saveMealRecords(data) {
+      if (isViewer) return;
+      localStorage.setItem(STORAGE_KEY_MEALS, JSON.stringify(data));
+      scheduleCloudSync();
+    }
+
+    // ===== Google 雲端共用 =====
+    const STORAGE_KEY_CLOUD_URL = 'metabolic_cloud_url_v1';
+    const STORAGE_KEY_CLOUD_KEY = 'metabolic_cloud_key_v1';
+    const STORAGE_KEY_CLOUD_AUTO = 'metabolic_cloud_auto_v1';
+    const STORAGE_KEY_CLOUD_LAST = 'metabolic_cloud_last_sync_v1';
+    const STORAGE_KEY_VIEWER_CACHE = 'metabolic_viewer_cache_v1';
+
+    const viewerSourceUrl = new URLSearchParams(location.search).get('view');
+    const isViewer = !!viewerSourceUrl;
+    let viewerData = { glucose: [], meals: [], updatedAt: null };
+    let cloudSyncTimer = null;
+
+    function isValidScriptUrl(url) {
+      return /^https:\/\/script\.google(usercontent)?\.com\//.test(url || '');
+    }
+
+    function formatSyncTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return `${d.getMonth() + 1}/${d.getDate()} ${d.toTimeString().slice(0, 5)}`;
+    }
+
+    function setCloudStatus(text, isError) {
+      const el = document.getElementById('cloudStatus');
+      el.textContent = text;
+      el.className = `text-[11px] border rounded-xl px-3 py-2 ${isError ? 'text-rose-600 bg-rose-50 border-rose-100' : 'text-slate-500 bg-slate-50 border-slate-100'}`;
+    }
+
+    function refreshCloudIndicator() {
+      const ready = isValidScriptUrl(localStorage.getItem(STORAGE_KEY_CLOUD_URL));
+      document.getElementById('cloudDot').classList.toggle('hidden', !ready);
+    }
+
+    function openCloudModal() {
+      document.getElementById('cloudUrlInput').value = localStorage.getItem(STORAGE_KEY_CLOUD_URL) || '';
+      document.getElementById('cloudKeyInput').value = localStorage.getItem(STORAGE_KEY_CLOUD_KEY) || '';
+      document.getElementById('cloudAutoInput').checked = localStorage.getItem(STORAGE_KEY_CLOUD_AUTO) !== 'off';
+      const last = localStorage.getItem(STORAGE_KEY_CLOUD_LAST);
+      setCloudStatus(last ? `上次上傳：${formatSyncTime(last)}` : '尚未上傳過');
+      document.getElementById('cloudModal').classList.remove('hidden');
+    }
+
+    function saveCloudSettingsAndUpload() {
+      let url = document.getElementById('cloudUrlInput').value.trim();
+      let key = document.getElementById('cloudKeyInput').value;
+      // iPhone 主畫面 App 與 Safari 資料分開，可直接把記錄者設定連結貼到網址欄
+      const setup = parseOwnerSetupLink(url);
+      if (setup) {
+        url = setup.url;
+        key = setup.key;
+        document.getElementById('cloudUrlInput').value = url;
+        document.getElementById('cloudKeyInput').value = key;
+      }
+      if (!isValidScriptUrl(url)) {
+        setCloudStatus('網址需為 https://script.google.com/macros/s/.../exec', true);
+        return;
+      }
+      if (!key) {
+        setCloudStatus('請輸入寫入密碼', true);
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY_CLOUD_URL, url);
+      localStorage.setItem(STORAGE_KEY_CLOUD_KEY, key);
+      localStorage.setItem(STORAGE_KEY_CLOUD_AUTO, document.getElementById('cloudAutoInput').checked ? 'on' : 'off');
+      refreshCloudIndicator();
+      uploadToCloud();
+    }
+
+    function scheduleCloudSync() {
+      if (localStorage.getItem(STORAGE_KEY_CLOUD_AUTO) === 'off') return;
+      if (!isValidScriptUrl(localStorage.getItem(STORAGE_KEY_CLOUD_URL))) return;
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = setTimeout(uploadToCloud, 1500);
+    }
+
+    async function uploadToCloud() {
+      const url = localStorage.getItem(STORAGE_KEY_CLOUD_URL);
+      const key = localStorage.getItem(STORAGE_KEY_CLOUD_KEY);
+      if (!isValidScriptUrl(url) || !key) return;
+      setCloudStatus('上傳中…');
+      try {
+        // text/plain 可避免 CORS 預檢，Apps Script 才能正常接收
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ key, glucose: getGlucoseRecords(), meals: getMealRecords() })
+        });
+        const result = await res.json();
+        if (!result.ok) throw new Error(result.error || '上傳失敗');
+        localStorage.setItem(STORAGE_KEY_CLOUD_LAST, result.updatedAt);
+        setCloudStatus(`✓ 已上傳：${formatSyncTime(result.updatedAt)}`);
+      } catch (err) {
+        setCloudStatus(`上傳失敗：${err.message}`, true);
+      }
+    }
+
+    async function copyShareLink() {
+      const url = localStorage.getItem(STORAGE_KEY_CLOUD_URL);
+      if (!isValidScriptUrl(url)) {
+        setCloudStatus('請先填入網址並按「儲存並上傳」', true);
+        return;
+      }
+      const link = `${location.origin}${location.pathname}?view=${encodeURIComponent(url)}`;
+      shareOrCopy('雙軌代謝日記（唯讀）', link, '✓ 已複製分享連結，傳給對方用瀏覽器開啟即可');
+    }
+
+    async function shareOrCopy(title, link, okText) {
+      try {
+        if (navigator.share) {
+          await navigator.share({ title, url: link });
+        } else {
+          await navigator.clipboard.writeText(link);
+          setCloudStatus(okText);
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') prompt('請複製以下連結：', link);
+      }
+    }
+
+    // 設定放在 # 之後，不會被送到網站伺服器
+    function copyOwnerSetupLink() {
+      const url = localStorage.getItem(STORAGE_KEY_CLOUD_URL);
+      const key = localStorage.getItem(STORAGE_KEY_CLOUD_KEY);
+      if (!isValidScriptUrl(url) || !key) {
+        setCloudStatus('請先填入網址與密碼並按「儲存並上傳」', true);
+        return;
+      }
+      const token = btoa(unescape(encodeURIComponent(JSON.stringify({ url, key }))));
+      const link = `${location.origin}${location.pathname}#setup=${token}`;
+      shareOrCopy('雙軌代謝日記（記錄者設定）', link, '✓ 已複製記錄者設定連結，請只傳給負責記錄的人');
+    }
+
+    function stopUploadingHere() {
+      if (!confirm('確定讓這支手機停止上傳？之後要查看雲端資料請改用「分享連結」。')) return;
+      clearTimeout(cloudSyncTimer);
+      [STORAGE_KEY_CLOUD_URL, STORAGE_KEY_CLOUD_KEY, STORAGE_KEY_CLOUD_AUTO, STORAGE_KEY_CLOUD_LAST].forEach(k => localStorage.removeItem(k));
+      refreshCloudIndicator();
+      closeModal('cloudModal');
+    }
+
+    function parseOwnerSetupLink(text) {
+      const match = (text || '').match(/#setup=([A-Za-z0-9+/=]+)/);
+      if (!match) return null;
+      try {
+        const config = JSON.parse(decodeURIComponent(escape(atob(match[1]))));
+        return isValidScriptUrl(config.url) && config.key ? config : null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function applyOwnerSetupFromHash() {
+      if (!location.hash.startsWith('#setup=')) return;
+      const config = parseOwnerSetupLink(location.hash);
+      history.replaceState(null, '', location.pathname);
+      if (!config) {
+        alert('記錄者設定連結無效');
+        return;
+      }
+      if (!confirm('要將這支手機設為「主要記錄者」嗎？\n設定後，這支手機的紀錄會上傳並取代雲端上的資料。')) return;
+      localStorage.setItem(STORAGE_KEY_CLOUD_URL, config.url);
+      localStorage.setItem(STORAGE_KEY_CLOUD_KEY, config.key);
+      localStorage.setItem(STORAGE_KEY_CLOUD_AUTO, 'on');
+      refreshCloudIndicator();
+      uploadToCloud().then(() => alert('設定完成！之後每次記錄都會自動同步到雲端。'));
+    }
+
+    async function loadViewerData() {
+      const label = document.getElementById('viewerUpdatedAt');
+      label.textContent = '載入中…';
+      try {
+        const res = await fetch(viewerSourceUrl, { cache: 'no-store' });
+        const data = await res.json();
+        viewerData = { glucose: data.glucose || [], meals: data.meals || [], updatedAt: data.updatedAt || null };
+        localStorage.setItem(STORAGE_KEY_VIEWER_CACHE + viewerSourceUrl, JSON.stringify(viewerData));
+        label.textContent = viewerData.updatedAt ? `最後更新 ${formatSyncTime(viewerData.updatedAt)}` : '對方尚未上傳資料';
+      } catch (err) {
+        label.textContent = '無法連線，顯示上次快取資料';
+      }
+      renderAll();
+    }
+
+    function initViewerMode() {
+      document.getElementById('viewerBanner').classList.remove('hidden');
+      document.getElementById('bottomBar').classList.add('hidden');
+      document.getElementById('cloudBtn').classList.add('hidden');
+      document.body.style.paddingBottom = 'calc(16px + env(safe-area-inset-bottom))';
+      if (!isValidScriptUrl(viewerSourceUrl)) {
+        document.getElementById('viewerUpdatedAt').textContent = '分享連結無效';
+        renderAll();
+        return;
+      }
+      try {
+        const cached = JSON.parse(localStorage.getItem(STORAGE_KEY_VIEWER_CACHE + viewerSourceUrl) || 'null');
+        if (cached) viewerData = cached;
+      } catch (err) {}
+      renderAll();
+      loadViewerData();
+    }
+
+    function calcGKI(glucoseMgDl, ketoneMmol) {
+      if (!ketoneMmol || ketoneMmol <= 0) return null;
+      return (glucoseMgDl / 18.01559) / ketoneMmol;
+    }
+
+    function getGkiBadge(gki) {
+      if (gki === null) return { text: '無血酮資料', color: 'bg-slate-100 text-slate-500' };
+      if (gki <= 1.0) return { text: '深度自噬/醫療級', color: 'bg-purple-100 text-purple-700 border-purple-200' };
+      if (gki <= 3.0) return { text: '最佳燃脂生酮', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+      if (gki <= 6.0) return { text: '溫和生酮維持', color: 'bg-sky-100 text-sky-700 border-sky-200' };
+      if (gki <= 9.0) return { text: '微弱生酮入酮', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+      return { text: '未入酮/常態供能', color: 'bg-slate-100 text-slate-600 border-slate-200' };
+    }
+
+    function formatGlucose(mgdlVal) {
+      if (isMgDl) return Math.round(mgdlVal);
+      return (mgdlVal / 18.01559).toFixed(1);
+    }
+    function toMgDl(inputVal) {
+      if (isMgDl) return parseFloat(inputVal);
+      return parseFloat(inputVal) * 18.01559;
+    }
+
+    function toggleUnit() {
+      isMgDl = !isMgDl;
+      localStorage.setItem(STORAGE_KEY_UNIT, isMgDl ? 'mg/dL' : 'mmol/L');
+      updateUnitUI();
+      renderAll();
+    }
+
+    function updateUnitUI() {
+      document.getElementById('unitBtn').textContent = isMgDl ? '單位: mg/dL' : '單位: mmol/L';
+      document.getElementById('unitLabel1').textContent = isMgDl ? 'mg/dL' : 'mmol/L';
+      document.getElementById('formUnitLabel').textContent = isMgDl ? '(mg/dL)' : '(mmol/L)';
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      ['all', 'part1', 'part2'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = "py-2 rounded-lg bg-white text-indigo-600 shadow-xs font-bold transition";
+        } else {
+          btn.className = "py-2 rounded-lg text-slate-600 hover:text-slate-900 font-medium transition";
+        }
+      });
+      const summary = document.getElementById('summaryBanner');
+      const chart = document.getElementById('chartSection');
+      if (tab === 'part2') {
+        summary.classList.add('hidden');
+        chart.classList.add('hidden');
+      } else {
+        summary.classList.remove('hidden');
+        chart.classList.remove('hidden');
+      }
+      renderStream();
+    }
+
+    function renderOverview() {
+      const glucoseList = getGlucoseRecords();
+      if (glucoseList.length === 0) {
+        document.getElementById('avgGlucose').textContent = '--';
+        document.getElementById('avgKetone').textContent = '--';
+        document.getElementById('latestGki').textContent = '--';
+        document.getElementById('gkiZone').textContent = '尚無紀錄';
+        return;
+      }
+      const totalG = glucoseList.reduce((acc, cur) => acc + cur.glucose, 0);
+      const totalK = glucoseList.reduce((acc, cur) => acc + cur.ketone, 0);
+      const avgG = totalG / glucoseList.length;
+      const avgK = totalK / glucoseList.length;
+
+      document.getElementById('avgGlucose').textContent = formatGlucose(avgG);
+      document.getElementById('avgKetone').textContent = avgK.toFixed(1);
+
+      const latest = [...glucoseList].sort((a,b) => (b.date + b.time).localeCompare(a.date + a.time))[0];
+      const gki = calcGKI(latest.glucose, latest.ketone);
+      if (gki !== null) {
+        document.getElementById('latestGki').textContent = gki.toFixed(2);
+        const badge = getGkiBadge(gki);
+        document.getElementById('gkiZone').textContent = badge.text;
+      }
+    }
+
+    function renderChart() {
+      const filter = document.getElementById('chartFilter').value;
+      let records = getGlucoseRecords();
+      if (filter !== 'all') {
+        records = records.filter(r => r.timingTitle === filter);
+      }
+      const sorted = [...records].sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(-12);
+      const labels = sorted.map(r => `${r.date.slice(5)} ${r.time}`);
+      const glucoseData = sorted.map(r => isMgDl ? r.glucose : (r.glucose / 18.01559).toFixed(1));
+      const ketoneData = sorted.map(r => r.ketone);
+
+      const ctx = document.getElementById('metabolicChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: `血醣 (${isMgDl ? 'mg/dL' : 'mmol/L'})`,
+              data: glucoseData,
+              borderColor: '#0284c7',
+              backgroundColor: 'rgba(2, 132, 199, 0.08)',
+              borderWidth: 2,
+              tension: 0.35,
+              fill: true,
+              yAxisID: 'y'
+            },
+            {
+              label: '血酮 (mmol/L)',
+              data: ketoneData,
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b',
+              borderWidth: 2,
+              type: 'bar',
+              barThickness: 10,
+              borderRadius: 4,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 0 } },
+            y: { type: 'linear', position: 'left', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } },
+            y1: { type: 'linear', position: 'right', grid: { display: false }, ticks: { font: { size: 9 } }, min: 0, max: 5 }
+          },
+          plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }
+        }
+      });
+    }
+
+    function renderStream() {
+      const container = document.getElementById('streamContainer');
+      container.innerHTML = '';
+      const glucoseList = getGlucoseRecords();
+      const mealList = getMealRecords();
+
+      if (currentTab === 'part1') renderPart1Only(container, glucoseList);
+      else if (currentTab === 'part2') renderPart2Only(container, mealList);
+      else renderDualTrack(container, glucoseList, mealList);
+    }
+
+    function renderDualTrack(container, gList, mList) {
+      const dateSet = new Set([...gList.map(g => g.date), ...mList.map(m => m.date)]);
+      const sortedDates = Array.from(dateSet).sort((a,b) => b.localeCompare(a));
+
+      if (sortedDates.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs">${isViewer ? '尚無任何紀錄' : '尚無任何糖酮或飲食紀錄，點擊下方按鈕開始記錄'}</div>`;
+        return;
+      }
+
+      sortedDates.forEach(date => {
+        const dayGlucose = gList.filter(g => g.date === date).sort((a,b) => b.time.localeCompare(a.time));
+        const dayMeals = mList.filter(m => m.date === date).sort((a,b) => b.time.localeCompare(a.time));
+
+        const dayWrapper = document.createElement('div');
+        dayWrapper.className = "bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3";
+        const dateHeader = `
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-4 rounded-full bg-indigo-500"></span>
+              <h3 class="font-bold text-sm text-slate-800">${formatDateFriendly(date)}</h3>
+              <span class="text-[11px] text-slate-400 font-mono">${date}</span>
+            </div>
+            <span class="text-[10px] text-slate-400">數值 ${dayGlucose.length} 筆 · 三餐 ${dayMeals.length} 筆</span>
+          </div>
+        `;
+        let dualContent = `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          <div class="space-y-2">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-sky-700 pb-1 border-b border-sky-100">
+              <i class="fa-solid fa-droplet text-sky-500"></i>
+              <span>醣酮</span>
+            </div>
+            ${dayGlucose.length === 0 ? '<p class="text-xs text-slate-400 py-3 text-center bg-slate-50 rounded-xl">本日無測量紀錄</p>' : ''}
+            <div class="space-y-2">${dayGlucose.map(g => renderGlucoseCardHTML(g)).join('')}</div>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center gap-1.5 text-xs font-bold text-amber-700 pb-1 border-b border-amber-100">
+              <i class="fa-solid fa-utensils text-amber-500"></i>
+              <span>三餐</span>
+            </div>
+            ${dayMeals.length === 0 ? '<p class="text-xs text-slate-400 py-3 text-center bg-slate-50 rounded-xl">本日無三餐飲食照片</p>' : ''}
+            <div class="space-y-2">${dayMeals.map(m => renderMealCardHTML(m)).join('')}</div>
+          </div>
+        </div>`;
+        dayWrapper.innerHTML = dateHeader + dualContent;
+        container.appendChild(dayWrapper);
+      });
+    }
+
+    function renderPart1Only(container, gList) {
+      if (gList.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs">尚無醣酮資料</div>`;
+        return;
+      }
+      const sorted = [...gList].sort((a,b) => (b.date + b.time).localeCompare(a.date + a.time));
+      const section = document.createElement('div');
+      section.className = "bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3";
+      section.innerHTML = `
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <h3 class="font-bold text-xs text-sky-800 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-droplet text-sky-500"></i>
+            醣酮歷史時間流 (${sorted.length})
+          </h3>
+        </div>
+        <div class="space-y-2.5">${sorted.map(g => renderGlucoseCardHTML(g, true)).join('')}</div>
+      `;
+      container.appendChild(section);
+    }
+
+    function renderPart2Only(container, mList) {
+      if (mList.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs">尚無三餐相片紀錄</div>`;
+        return;
+      }
+      const sorted = [...mList].sort((a,b) => (b.date + b.time).localeCompare(a.date + a.time));
+      const section = document.createElement('div');
+      section.className = "bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-3";
+      section.innerHTML = `
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <h3 class="font-bold text-xs text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-utensils text-amber-500"></i>
+            三餐飲食相簿 (${sorted.length})
+          </h3>
+        </div>
+        <div class="space-y-3">${sorted.map(m => renderMealCardHTML(m, true)).join('')}</div>
+      `;
+      container.appendChild(section);
+    }
+
+    function renderGlucoseCardHTML(item, showDate = false) {
+      const gki = calcGKI(item.glucose, item.ketone);
+      const badge = getGkiBadge(gki);
+
+      let timingStyle = 'bg-sky-50 text-sky-700 border-sky-200';
+      if (item.timingTitle === '午時空腹') timingStyle = 'bg-cyan-50 text-cyan-700 border-cyan-200';
+      if (item.timingTitle === '餐後2時') timingStyle = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      if (item.timingTitle === '餐後3時') timingStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+
+      return `
+        <div class="p-3 bg-slate-50/80 hover:bg-slate-50 rounded-xl border border-slate-100 transition">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-md border ${timingStyle}">${item.timingTitle || '早上空腹'}</span>
+              <span class="text-[11px] font-mono text-slate-500">${showDate ? item.date + ' ' : ''}${item.time}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] px-1.5 py-0.5 rounded border font-medium ${badge.color}">${badge.text}</span>
+              ${isViewer ? '' : `<button onclick="editGlucoseRecord('${item.id}')" class="text-slate-400 hover:text-sky-600 text-xs p-1" title="修改數值">
+                <i class="fa-regular fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteGlucoseRecord('${item.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1" title="刪除數值">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>`}
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 py-1">
+            <div class="bg-white rounded-lg p-1.5 text-center border border-slate-100 shadow-2xs">
+              <div class="text-[10px] text-slate-400">血醣 (${isMgDl ? 'mg/dL' : 'mmol/L'})</div>
+              <div class="font-bold text-sky-700 text-sm">${formatGlucose(item.glucose)}</div>
+            </div>
+            <div class="bg-white rounded-lg p-1.5 text-center border border-slate-100 shadow-2xs">
+              <div class="text-[10px] text-slate-400">酮體 (mmol/L)</div>
+              <div class="font-bold text-amber-600 text-sm">${item.ketone.toFixed(1)}</div>
+            </div>
+            <div class="bg-white rounded-lg p-1.5 text-center border border-slate-100 shadow-2xs">
+              <div class="text-[10px] text-slate-400">GKI 指數</div>
+              <div class="font-bold text-slate-800 text-sm">${gki ? gki.toFixed(1) : '--'}</div>
+            </div>
+          </div>
+          ${item.notes ? `<div class="mt-1.5 text-[11px] text-slate-500 bg-white/70 px-2 py-1 rounded border border-slate-100"><i class="fa-regular fa-comment-dots text-slate-400 mr-1"></i>${item.notes}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderMealCardHTML(meal, showDate = false) {
+      let carbBadge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      if (meal.carbLevel === '低碳溫和') carbBadge = 'bg-sky-50 text-sky-700 border-sky-200';
+      if (meal.carbLevel === '適量碳水') carbBadge = 'bg-amber-50 text-amber-700 border-amber-200';
+      if (meal.carbLevel === '高碳升糖') carbBadge = 'bg-rose-50 text-rose-700 border-rose-200';
+
+      return `
+        <div class="p-3 bg-slate-50/80 hover:bg-slate-50 rounded-xl border border-slate-100 transition space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-md">${meal.mealType}</span>
+              <span class="text-[11px] font-mono text-slate-500">${showDate ? meal.date + ' ' : ''}${meal.time}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] px-1.5 py-0.5 rounded border font-medium ${carbBadge}">${meal.carbLevel}</span>
+              ${isViewer ? '' : `<button onclick="editMealRecord('${meal.id}')" class="text-slate-400 hover:text-amber-600 text-xs p-1" title="修改內容與照片">
+                <i class="fa-regular fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteMealRecord('${meal.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1" title="刪除餐食">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>`}
+            </div>
+          </div>
+          ${meal.photo ? `
+            <div class="relative cursor-pointer group" onclick="showLightbox('${meal.photo}', '${meal.mealType} - ${meal.foodDesc.replace(/'/g, "\'")}')">
+              <img src="${meal.photo}" alt="${meal.mealType}" class="w-full h-32 object-cover rounded-lg border border-slate-200 group-hover:opacity-95 transition">
+              <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                <i class="fa-solid fa-magnifying-glass-plus"></i>放大
+              </div>
+            </div>
+          ` : ''}
+          <div class="text-xs text-slate-700 font-medium bg-white p-2 rounded-lg border border-slate-100">${meal.foodDesc}</div>
+        </div>
+      `;
+    }
+
+    function openNewGlucoseModal() {
+      document.getElementById('editGlucoseId').value = '';
+      const titleElem = document.getElementById('glucoseModalTitle');
+      if (titleElem) titleElem.textContent = '記錄醣酮';
+      document.getElementById('glucoseSubmitBtn').textContent = '儲存醣酮';
+      document.getElementById('glucoseForm').reset();
+      const radio = document.querySelector('input[name="timingTitle"][value="早上空腹"]');
+      if (radio) radio.checked = true;
+      openModal('glucoseModal');
+    }
+
+    function editGlucoseRecord(id) {
+      const records = getGlucoseRecords();
+      const item = records.find(r => String(r.id) === String(id));
+      if (!item) return;
+
+      document.getElementById('editGlucoseId').value = item.id;
+      const titleElem = document.getElementById('glucoseModalTitle');
+      if (titleElem) titleElem.textContent = '修改醣酮';
+      document.getElementById('glucoseSubmitBtn').textContent = '確認更新糖酮';
+
+      const timingRadios = document.querySelectorAll('input[name="timingTitle"]');
+      timingRadios.forEach(r => { r.checked = (r.value === item.timingTitle); });
+
+      document.getElementById('glucoseDate').value = item.date;
+      document.getElementById('glucoseTime').value = item.time;
+      document.getElementById('glucoseValue').value = formatGlucose(item.glucose);
+      document.getElementById('ketoneValue').value = item.ketone;
+      document.getElementById('glucoseNotes').value = item.notes || '';
+
+      calcPreviewGki();
+      document.getElementById('glucoseModal').classList.remove('hidden');
+    }
+
+    function saveGlucoseRecord(e) {
+      e.preventDefault();
+      const form = document.getElementById('glucoseForm');
+      const editId = document.getElementById('editGlucoseId').value;
+      const timingTitle = form.querySelector('input[name="timingTitle"]:checked').value;
+      const date = document.getElementById('glucoseDate').value;
+      const time = document.getElementById('glucoseTime').value;
+      const rawG = parseFloat(document.getElementById('glucoseValue').value);
+      const rawK = parseFloat(document.getElementById('ketoneValue').value);
+      const notes = document.getElementById('glucoseNotes').value.trim();
+
+      const glucoseMgDl = toMgDl(rawG);
+      let records = getGlucoseRecords();
+
+      if (editId) {
+        const index = records.findIndex(r => String(r.id) === String(editId));
+        if (index !== -1) {
+          records[index] = { ...records[index], timingTitle, date, time, glucose: glucoseMgDl, ketone: rawK, notes };
+        }
+      } else {
+        const newRecord = { id: 'g_' + Date.now(), timingTitle, date, time, glucose: glucoseMgDl, ketone: rawK, notes };
+        records.unshift(newRecord);
+      }
+
+      saveGlucoseRecords(records);
+      closeModal('glucoseModal');
+      form.reset();
+      renderAll();
+    }
+
+    function calcPreviewGki() {
+      const gVal = parseFloat(document.getElementById('glucoseValue').value);
+      const kVal = parseFloat(document.getElementById('ketoneValue').value);
+      const box = document.getElementById('previewGkiVal');
+      const text = document.getElementById('previewGkiText');
+
+      if (!isNaN(gVal) && !isNaN(kVal) && kVal > 0) {
+        const mgdl = toMgDl(gVal);
+        const gki = calcGKI(mgdl, kVal);
+        box.textContent = gki.toFixed(2);
+        const badge = getGkiBadge(gki);
+        text.textContent = badge.text;
+      } else {
+        box.textContent = '--';
+        text.textContent = '請輸入完整數值';
+      }
+    }
+
+    function openNewMealModal() {
+      document.getElementById('editMealId').value = '';
+      const titleElem = document.getElementById('mealModalTitle');
+      if (titleElem) titleElem.textContent = '記錄三餐';
+      document.getElementById('mealSubmitBtn').textContent = '儲存三餐';
+      document.getElementById('mealForm').reset();
+      clearPhoto();
+      openModal('mealModal');
+    }
+
+    function editMealRecord(id) {
+      const records = getMealRecords();
+      const meal = records.find(m => String(m.id) === String(id));
+      if (!meal) return;
+
+      document.getElementById('editMealId').value = meal.id;
+      const titleElem = document.getElementById('mealModalTitle');
+      if (titleElem) titleElem.textContent = '修改三餐';
+      document.getElementById('mealSubmitBtn').textContent = '確認更新餐食';
+
+      document.querySelectorAll('input[name="mealType"]').forEach(r => { r.checked = (r.value === meal.mealType); });
+      document.querySelectorAll('input[name="carbLevel"]').forEach(r => { r.checked = (r.value === meal.carbLevel); });
+
+      document.getElementById('mealDate').value = meal.date;
+      document.getElementById('mealTime').value = meal.time;
+      document.getElementById('mealFoodDesc').value = meal.foodDesc || '';
+
+      currentCompressedPhoto = meal.photo || null;
+      if (currentCompressedPhoto) {
+        document.getElementById('photoPlaceholder').classList.add('hidden');
+        document.getElementById('photoPreviewContainer').classList.remove('hidden');
+        document.getElementById('photoPreviewImg').src = currentCompressedPhoto;
+      } else {
+        clearPhoto();
+      }
+
+      document.getElementById('mealModal').classList.remove('hidden');
+    }
+
+    function saveMealRecord(e) {
+      e.preventDefault();
+      const form = document.getElementById('mealForm');
+      const editId = document.getElementById('editMealId').value;
+      const mealType = form.querySelector('input[name="mealType"]:checked').value;
+      const carbLevel = form.querySelector('input[name="carbLevel"]:checked').value;
+      const date = document.getElementById('mealDate').value;
+      const time = document.getElementById('mealTime').value;
+      const foodDesc = document.getElementById('mealFoodDesc').value.trim();
+
+      let records = getMealRecords();
+
+      if (editId) {
+        const index = records.findIndex(m => String(m.id) === String(editId));
+        if (index !== -1) {
+          records[index] = { ...records[index], mealType, carbLevel, date, time, foodDesc, photo: currentCompressedPhoto || '' };
+        }
+      } else {
+        const newMeal = { id: 'm_' + Date.now(), mealType, carbLevel, date, time, foodDesc, photo: currentCompressedPhoto || '' };
+        records.unshift(newMeal);
+      }
+
+      saveMealRecords(records);
+      closeModal('mealModal');
+      form.reset();
+      clearPhoto();
+      renderAll();
+    }
+
+    function handlePhotoUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+          currentCompressedPhoto = canvas.toDataURL('image/jpeg', 0.72);
+
+          document.getElementById('photoPlaceholder').classList.add('hidden');
+          document.getElementById('photoPreviewContainer').classList.remove('hidden');
+          document.getElementById('photoPreviewImg').src = currentCompressedPhoto;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearPhoto(e) {
+      if (e) e.stopPropagation();
+      currentCompressedPhoto = null;
+      const camInput = document.getElementById('mealCameraInput');
+      const galInput = document.getElementById('mealGalleryInput');
+      if (camInput) camInput.value = '';
+      if (galInput) galInput.value = '';
+      document.getElementById('photoPreviewImg').src = '';
+      document.getElementById('photoPlaceholder').classList.remove('hidden');
+      document.getElementById('photoPreviewContainer').classList.add('hidden');
+    }
+
+    function deleteGlucoseRecord(id) {
+      if (!confirm('確定刪除此筆血醣酮體數值？')) return;
+      let records = getGlucoseRecords().filter(r => String(r.id) !== String(id));
+      saveGlucoseRecords(records);
+      renderAll();
+    }
+
+    function deleteMealRecord(id) {
+      if (!confirm('確定刪除此筆三餐飲食紀錄？')) return;
+      let records = getMealRecords().filter(r => String(r.id) !== String(id));
+      saveMealRecords(records);
+      renderAll();
+    }
+
+    function openModal(id) {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const timeStr = now.toTimeString().slice(0, 5);
+
+      if (id === 'glucoseModal' && !document.getElementById('editGlucoseId').value) {
+        document.getElementById('glucoseDate').value = today;
+        document.getElementById('glucoseTime').value = timeStr;
+        calcPreviewGki();
+      } else if (id === 'mealModal' && !document.getElementById('editMealId').value) {
+        document.getElementById('mealDate').value = today;
+        document.getElementById('mealTime').value = timeStr;
+      }
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function showLightbox(imgSrc, caption) {
+      document.getElementById('lightboxImg').src = imgSrc;
+      document.getElementById('lightboxCaption').textContent = caption;
+      document.getElementById('lightboxModal').classList.remove('hidden');
+    }
+    function closeLightbox() {
+      document.getElementById('lightboxModal').classList.add('hidden');
+    }
+
+    function formatDateFriendly(dateStr) {
+      const today = new Date().toISOString().slice(0, 10);
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      if (dateStr === today) return '今天';
+      if (dateStr === yesterday) return '昨天';
+      return dateStr.slice(5).replace('-', '月') + '日';
+    }
+
+    function exportCSV() {
+      const gList = getGlucoseRecords();
+      const mList = getMealRecords();
+
+      let csv = '\uFEFF';
+      csv += '=== 醣酮數值紀錄 ===\r\n';
+      csv += '量測時點情境(Title),量測日期,時間,血醣(mg/dL),血酮(mmol/L),GKI指數,診斷等級,備註\r\n';
+
+      gList.forEach(g => {
+        const gki = calcGKI(g.glucose, g.ketone);
+        const badge = getGkiBadge(gki);
+        csv += `"${g.timingTitle}","${g.date}","${g.time}",${Math.round(g.glucose)},${g.ketone.toFixed(1)},${gki ? gki.toFixed(2) : ''},"${badge.text}","${(g.notes || '').replace(/"/g, '""')}"\r\n`;
+      });
+
+      csv += '\r\n=== 三餐飲食生活紀錄 ===\r\n';
+      csv += '餐別,用餐日期,時間,碳水比例,食物內容說明,是否附有照片\r\n';
+
+      mList.forEach(m => {
+        csv += `"${m.mealType}","${m.date}","${m.time}","${m.carbLevel}","${m.foodDesc.replace(/"/g, '""')}","${m.photo ? '是' : '否'}"\r\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `雙軌代謝追蹤表_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function renderAll() {
+      updateUnitUI();
+      renderOverview();
+      renderChart();
+      renderStream();
+    }
+
+    window.onload = function() {
+      if (isViewer) {
+        initViewerMode();
+      } else {
+        initSeedData();
+        refreshCloudIndicator();
+        renderAll();
+        applyOwnerSetupFromHash();
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+    };
+  </script>
+</body>
+</html>
