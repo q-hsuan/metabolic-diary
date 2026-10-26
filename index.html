@@ -450,28 +450,18 @@
     let currentCompressedPhoto = null;
     let chartInstance = null;
 
-    function initSeedData() {
-      if (!localStorage.getItem(STORAGE_KEY_GLUCOSE)) {
-        const seedGlucose = [
-          { id: 'g1', timingTitle: '早上空腹', date: '2026-10-25', time: '07:30', glucose: 88, ketone: 1.6, notes: '晨起精神佳，深沉睡眠7.5小時' },
-          { id: 'g2', timingTitle: '餐後2時', date: '2026-10-25', time: '10:15', glucose: 104, ketone: 1.2, notes: '早餐後2小時量測' },
-          { id: 'g3', timingTitle: '餐後3時', date: '2026-10-25', time: '11:15', glucose: 91, ketone: 1.4, notes: '血醣順利回歸基礎線' },
-          { id: 'g4', timingTitle: '午時空腹', date: '2026-10-25', time: '12:30', glucose: 86, ketone: 1.8, notes: '午餐前空腹量測' },
-          { id: 'g5', timingTitle: '餐後2時', date: '2026-10-25', time: '14:45', glucose: 112, ketone: 1.0, notes: '午餐後2小時' },
-          { id: 'g6', timingTitle: '餐後3時', date: '2026-10-25', time: '15:45', glucose: 94, ketone: 1.3, notes: '午後能量平穩' },
-          { id: 'g7', timingTitle: '早上空腹', date: '2026-10-24', time: '07:40', glucose: 92, ketone: 1.4, notes: '起床測量' }
-        ];
-        localStorage.setItem(STORAGE_KEY_GLUCOSE, JSON.stringify(seedGlucose));
-      }
+    // 舊版會自動放入示範資料；只移除內容未被修改過的示範紀錄
+    const DEMO_GLUCOSE = { g1: '晨起精神佳，深沉睡眠7.5小時', g2: '早餐後2小時量測', g3: '血醣順利回歸基礎線', g4: '午餐前空腹量測', g5: '午餐後2小時', g6: '午後能量平穩', g7: '起床測量' };
+    const DEMO_MEALS = { m1: '防彈黑咖啡(MCT油+草飼牛油) + 雙半熟荷包蛋 + 堅果少許', m2: '嫩煎雞腿排佐花椰菜米 + 酪梨半顆佐黑胡椒海鹽', m3: '起司歐姆蛋佐煙燻培根兩片 + 無糖黑咖啡' };
 
-      if (!localStorage.getItem(STORAGE_KEY_MEALS)) {
-        const seedMeals = [
-          { id: 'm1', mealType: '早餐', date: '2026-10-25', time: '08:15', carbLevel: '嚴格生酮', foodDesc: '防彈黑咖啡(MCT油+草飼牛油) + 雙半熟荷包蛋 + 堅果少許', photo: '' },
-          { id: 'm2', mealType: '午餐', date: '2026-10-25', time: '12:45', carbLevel: '低碳溫和', foodDesc: '嫩煎雞腿排佐花椰菜米 + 酪梨半顆佐黑胡椒海鹽', photo: '' },
-          { id: 'm3', mealType: '早餐', date: '2026-10-24', time: '08:30', carbLevel: '嚴格生酮', foodDesc: '起司歐姆蛋佐煙燻培根兩片 + 無糖黑咖啡', photo: '' }
-        ];
-        localStorage.setItem(STORAGE_KEY_MEALS, JSON.stringify(seedMeals));
-      }
+    function removeDemoData() {
+      const glucose = getGlucoseRecords();
+      const keptGlucose = glucose.filter(r => DEMO_GLUCOSE[r.id] !== r.notes);
+      if (keptGlucose.length !== glucose.length) saveGlucoseRecords(keptGlucose);
+
+      const meals = getMealRecords();
+      const keptMeals = meals.filter(m => DEMO_MEALS[m.id] !== m.foodDesc);
+      if (keptMeals.length !== meals.length) saveMealRecords(keptMeals);
     }
 
     function getGlucoseRecords() {
@@ -1308,7 +1298,7 @@
       if (isViewer) {
         initViewerMode();
       } else {
-        initSeedData();
+        removeDemoData();
         refreshCloudIndicator();
         renderAll();
         applyOwnerSetupFromHash();
