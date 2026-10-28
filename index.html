@@ -417,8 +417,22 @@
               <i class="fa-solid fa-ban mr-1"></i>此手機停止上傳
             </button>
           </div>
-          <button onclick="importRecordsFromCode()" class="w-full py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium text-xs">
-            <i class="fa-solid fa-file-import mr-1"></i>貼上還原碼，補回紀錄
+        </div>
+        <div class="border-t border-slate-100 pt-3 space-y-2">
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            <b class="text-slate-700">備份與還原：</b>雲端每天會自動備份到 Google 雲端硬碟的「metabolic-diary-backups」資料夾。也可以隨時把這支手機的全部紀錄（含照片）存成備份檔。還原只會補回缺少的紀錄，不會刪除或覆蓋現有紀錄。
+          </p>
+          <input type="file" id="backupFileInput" accept=".json,application/json" onchange="importBackupFile(event)" class="hidden">
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="downloadBackup()" class="py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium text-xs">
+              <i class="fa-solid fa-download mr-1"></i>下載備份檔
+            </button>
+            <button onclick="document.getElementById('backupFileInput').click()" class="py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium text-xs">
+              <i class="fa-solid fa-file-import mr-1"></i>從備份檔還原
+            </button>
+          </div>
+          <button onclick="importRecordsFromCode()" class="w-full py-2 rounded-xl text-slate-500 hover:bg-slate-50 font-medium text-[11px]">
+            <i class="fa-solid fa-paste mr-1"></i>貼上還原碼，補回紀錄
           </button>
         </div>
       </div>
@@ -644,7 +658,57 @@
         alert('還原碼無效，請確認有完整複製。');
         return;
       }
+      mergeImportedRecords(data);
+    }
 
+    async function downloadBackup() {
+      const today = new Date().toISOString().slice(0, 10);
+      const backup = { app: 'metabolic-diary', exportedAt: new Date().toISOString(), glucose: getGlucoseRecords(), meals: getMealRecords() };
+      const file = new File([JSON.stringify(backup)], `代謝日記備份_${today}.json`, { type: 'application/json' });
+
+      // iPhone 主畫面 App 無法直接下載，改用分享選單（可存到「檔案」或傳 LINE）
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: file.name });
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function importBackupFile(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        let data;
+        try {
+          data = JSON.parse(reader.result);
+        } catch (err) {
+          alert('備份檔無法讀取，請確認選的是代謝日記的備份檔。');
+          return;
+        }
+        if (!Array.isArray(data.glucose) && !Array.isArray(data.meals)) {
+          alert('這個檔案裡沒有代謝日記的紀錄。');
+          return;
+        }
+        mergeImportedRecords(data);
+      };
+      reader.readAsText(file);
+    }
+
+    // 只補回手機裡沒有的紀錄，不刪除、不覆蓋任何現有紀錄
+    function mergeImportedRecords(data) {
       const sameGlucose = (a, b) => a.id === b.id ||
         (a.date === b.date && a.timingTitle === b.timingTitle && a.glucose === b.glucose && a.ketone === b.ketone);
       const glucose = getGlucoseRecords();
