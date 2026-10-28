@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metabolic-app-v4';
+const CACHE_NAME = 'metabolic-app-v5';
 const ASSETS = [
   './index.html',
   './manifest.json',
