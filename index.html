@@ -417,6 +417,9 @@
               <i class="fa-solid fa-ban mr-1"></i>此手機停止上傳
             </button>
           </div>
+          <button onclick="importRecordsFromCode()" class="w-full py-2.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium text-xs">
+            <i class="fa-solid fa-file-import mr-1"></i>貼上還原碼，補回紀錄
+          </button>
         </div>
       </div>
     </div>
@@ -450,16 +453,31 @@
     let chartInstance = null;
 
     // 舊版會自動放入示範資料；只移除內容未被修改過的示範紀錄
-    const DEMO_GLUCOSE = { g1: '晨起精神佳，深沉睡眠7.5小時', g2: '早餐後2小時量測', g3: '血醣順利回歸基礎線', g4: '午餐前空腹量測', g5: '午餐後2小時', g6: '午後能量平穩', g7: '起床測量' };
-    const DEMO_MEALS = { m1: '防彈黑咖啡(MCT油+草飼牛油) + 雙半熟荷包蛋 + 堅果少許', m2: '嫩煎雞腿排佐花椰菜米 + 酪梨半顆佐黑胡椒海鹽', m3: '起司歐姆蛋佐煙燻培根兩片 + 無糖黑咖啡' };
+    // 只有每個欄位都和原始示範資料一模一樣才算示範資料，避免誤刪被修改過的紀錄
+    const DEMO_GLUCOSE = {
+      g1: '早上空腹|2026-10-25|07:30|88|1.6|晨起精神佳，深沉睡眠7.5小時',
+      g2: '餐後2時|2026-10-25|10:15|104|1.2|早餐後2小時量測',
+      g3: '餐後3時|2026-10-25|11:15|91|1.4|血醣順利回歸基礎線',
+      g4: '午時空腹|2026-10-25|12:30|86|1.8|午餐前空腹量測',
+      g5: '餐後2時|2026-10-25|14:45|112|1|午餐後2小時',
+      g6: '餐後3時|2026-10-25|15:45|94|1.3|午後能量平穩',
+      g7: '早上空腹|2026-10-24|07:40|92|1.4|起床測量'
+    };
+    const DEMO_MEALS = {
+      m1: '早餐|2026-10-25|08:15|嚴格生酮|防彈黑咖啡(MCT油+草飼牛油) + 雙半熟荷包蛋 + 堅果少許',
+      m2: '午餐|2026-10-25|12:45|低碳溫和|嫩煎雞腿排佐花椰菜米 + 酪梨半顆佐黑胡椒海鹽',
+      m3: '早餐|2026-10-24|08:30|嚴格生酮|起司歐姆蛋佐煙燻培根兩片 + 無糖黑咖啡'
+    };
 
     function removeDemoData() {
       const glucose = getGlucoseRecords();
-      const keptGlucose = glucose.filter(r => DEMO_GLUCOSE[r.id] !== r.notes);
+      const keptGlucose = glucose.filter(r =>
+        DEMO_GLUCOSE[r.id] !== [r.timingTitle, r.date, r.time, r.glucose, r.ketone, r.notes].join('|'));
       if (keptGlucose.length !== glucose.length) saveGlucoseRecords(keptGlucose);
 
       const meals = getMealRecords();
-      const keptMeals = meals.filter(m => DEMO_MEALS[m.id] !== m.foodDesc);
+      const keptMeals = meals.filter(m =>
+        getMealPhotos(m).length > 0 || DEMO_MEALS[m.id] !== [m.mealType, m.date, m.time, m.carbLevel, m.foodDesc].join('|'));
       if (keptMeals.length !== meals.length) saveMealRecords(keptMeals);
     }
 
@@ -612,6 +630,40 @@
       const token = btoa(unescape(encodeURIComponent(JSON.stringify({ url, key }))));
       const link = `${location.origin}${location.pathname}#setup=${token}`;
       shareOrCopy('雙軌代謝日記（記錄者設定）', link, '✓ 已複製記錄者設定連結，請只傳給負責記錄的人');
+    }
+
+    // 還原碼格式：RESTORE: + base64(JSON { glucose: [...], meals: [...] })；已存在的紀錄不會重複加入
+    function importRecordsFromCode() {
+      const input = prompt('請貼上還原碼：');
+      if (!input) return;
+      let data;
+      try {
+        const raw = input.trim().replace(/^RESTORE:/, '');
+        data = JSON.parse(decodeURIComponent(escape(atob(raw))));
+      } catch (err) {
+        alert('還原碼無效，請確認有完整複製。');
+        return;
+      }
+
+      const sameGlucose = (a, b) => a.id === b.id ||
+        (a.date === b.date && a.timingTitle === b.timingTitle && a.glucose === b.glucose && a.ketone === b.ketone);
+      const glucose = getGlucoseRecords();
+      const newGlucose = (data.glucose || []).filter(r => !glucose.some(g => sameGlucose(g, r)));
+
+      const meals = getMealRecords();
+      const newMeals = (data.meals || []).filter(r => !meals.some(m => m.id === r.id));
+
+      if (newGlucose.length + newMeals.length === 0) {
+        alert('這些紀錄都已經在手機裡了，不需要補。');
+        return;
+      }
+      if (!confirm(`將補回 ${newGlucose.length} 筆醣酮、${newMeals.length} 筆三餐紀錄，確定嗎？`)) return;
+
+      if (newGlucose.length) saveGlucoseRecords([...newGlucose, ...glucose]);
+      if (newMeals.length) saveMealRecords([...newMeals, ...meals]);
+      closeModal('cloudModal');
+      renderAll();
+      alert('已補回紀錄！');
     }
 
     function stopUploadingHere() {
