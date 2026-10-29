@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="fontawesome/css/all.min.css">
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -158,7 +158,7 @@
           <h3 id="glucoseModalTitle" class="font-bold text-slate-800 text-base">記錄醣酮</h3>
         </div>
         <button onclick="closeModal('glucoseModal')" class="text-slate-400 hover:text-slate-600 p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
@@ -253,7 +253,7 @@
           <h3 id="mealModalTitle" class="font-bold text-slate-800 text-base">記錄三餐</h3>
         </div>
         <button onclick="closeModal('mealModal')" class="text-slate-400 hover:text-slate-600 p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
@@ -376,7 +376,7 @@
           <h3 class="font-bold text-slate-800 text-base">Google 雲端共用</h3>
         </div>
         <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-600 p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
@@ -443,7 +443,7 @@
   <div id="lightboxModal" onclick="closeLightbox()" class="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 hidden">
     <div class="relative max-w-md w-full" onclick="event.stopPropagation()">
       <button onclick="closeLightbox()" class="absolute -top-10 right-0 text-white text-xl p-2">
-        <i class="fa-solid fa-xmark"></i>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
       <img id="lightboxImg" src="" alt="放大食物照" class="w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl">
       <button id="lightboxPrev" onclick="stepLightbox(-1)" class="hidden absolute left-1 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 text-white">
@@ -1056,10 +1056,10 @@
             <div class="flex items-center gap-1">
               <span class="text-[10px] px-1.5 py-0.5 rounded border font-medium ${badge.color}">${badge.text}</span>
               ${isViewer ? '' : `<button onclick="editGlucoseRecord('${item.id}')" class="text-slate-400 hover:text-sky-600 text-xs p-1" title="修改數值">
-                <i class="fa-regular fa-pen-to-square"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
               </button>
               <button onclick="deleteGlucoseRecord('${item.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1" title="刪除數值">
-                <i class="fa-regular fa-trash-can"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>`}
             </div>
           </div>
@@ -1124,10 +1124,10 @@
             <div class="flex items-center gap-1">
               <span class="text-[10px] px-1.5 py-0.5 rounded border font-medium ${carbBadge}">${meal.carbLevel}</span>
               ${isViewer ? '' : `<button onclick="editMealRecord('${meal.id}')" class="text-slate-400 hover:text-amber-600 text-xs p-1" title="修改內容與照片">
-                <i class="fa-regular fa-pen-to-square"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
               </button>
               <button onclick="deleteMealRecord('${meal.id}')" class="text-slate-300 hover:text-rose-500 text-xs p-1" title="刪除餐食">
-                <i class="fa-regular fa-trash-can"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>`}
             </div>
           </div>
@@ -1356,7 +1356,7 @@
         <div class="relative">
           <img src="${src}" alt="食物照片 ${i + 1}" class="w-full aspect-square object-cover rounded-lg border border-slate-200">
           <button type="button" onclick="removePhoto(${i})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 hover:bg-rose-600 text-white text-xs flex items-center justify-center" title="移除這張">
-            <i class="fa-solid fa-xmark"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
       `).join('') + addTile('mealCameraInput', 'fa-camera text-amber-500', '再拍一張') + addTile('mealGalleryInput', 'fa-images text-indigo-500', '從相簿加');

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'metabolic-app-v6';
+const CACHE_NAME = 'metabolic-app-v7';
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './fontawesome/css/all.min.css',
+  './fontawesome/webfonts/fa-solid-900.woff2',
+  './fontawesome/webfonts/fa-regular-400.woff2'
 ];
 
 self.addEventListener('install', (e) => {

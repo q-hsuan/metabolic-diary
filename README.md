@@ -131,4 +131,5 @@
 | `index.html` | App 主程式 |
 | `sw.js` | 離線快取（Service Worker） |
 | `manifest.json`、`icon-*.png` | 加到主畫面用的名稱與圖示 |
+| `fontawesome/` | App 內的按鈕圖示（Font Awesome 6.4.0） |
 | `google-apps-script.gs` | 雲端後端程式範本，複製貼到 Google Apps Script 使用（密碼只在 Apps Script 裡設定） |
